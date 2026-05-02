@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Pomodoro</title>
+
+<!-- PWA -->
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pomodoro">
+<meta name="description" content="Minimalist black and white Pomodoro timer with custom cycles.">
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --border: #e5e5e5;
+    --border-strong: #111111;
+    --text: #111111;
+    --text-muted: #888888;
+    --text-subtle: #aaaaaa;
+    --track: #ececec;
+    --accent: #111111;
+    --accent-fg: #ffffff;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #2a2a2a;
+    --border-strong: #f5f5f5;
+    --text: #f5f5f5;
+    --text-muted: #888888;
+    --text-subtle: #555555;
+    --track: #252525;
+    --accent: #f5f5f5;
+    --accent-fg: #111111;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .app {
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .icon-btn:hover { background: var(--track); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  .view { padding: 18px; }
+
+  .task-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .task-item {
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+    color: var(--text);
+    font-family: inherit;
+    gap: 8px;
+  }
+  .task-item:hover { border-color: var(--text-muted); }
+  .task-item.selected { border-color: var(--border-strong); }
+
+  .task-info { min-width: 0; flex: 1; }
+  .task-info p:first-child {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .task-info p:last-child {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .task-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .radio {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--text-subtle);
+    flex-shrink: 0;
+  }
+  .task-item.selected .radio {
+    border-color: var(--border-strong);
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .task-item.selected .radio::after {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-fg);
+  }
+
+  .task-edit {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    color: var(--text-muted);
+  }
+  .task-edit:hover { color: var(--text); background: var(--track); }
+  .task-edit svg { width: 11px; height: 11px; }
+
+  .add-task {
+    border: 0.5px dashed var(--text-subtle);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    cursor: pointer;
+    background: transparent;
+    width: 100%;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .add-task:hover { color: var(--text); border-color: var(--text-muted); }
+
+  .start-bar {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    justify-content: center;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary:not(:disabled):hover { opacity: 0.85; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .btn-secondary:hover { border-color: var(--text-muted); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--text-muted);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-danger:hover { color: var(--text); border-color: var(--text-muted); }
+
+  .editor h2 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 14px;
+    letter-spacing: 0.3px;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+  .field input {
+    width: 100%;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--border-strong); }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .field-row .field { margin-bottom: 12px; }
+
+  .editor-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .editor-actions .btn-secondary,
+  .editor-actions .btn-primary,
+  .editor-actions .btn-danger { flex: 1; }
+
+  .timer-view { text-align: center; }
+
+  .phase-label {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timer-ring {
+    margin: 0 auto 14px;
+    width: 160px;
+    height: 160px;
+    display: block;
+  }
+  .timer-ring text.time {
+    font-size: 22px;
+    font-weight: 500;
+    fill: var(--text);
+    font-family: inherit;
+  }
+  .timer-ring text.sub {
+    font-size: 8px;
+    fill: var(--text-muted);
+    letter-spacing: 1.5px;
+    font-family: inherit;
+  }
+
+  .cycle-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    min-height: 10px;
+    flex-wrap: wrap;
+    padding: 2px 0;
+  }
+  .cycle-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--text-subtle);
+    flex-shrink: 0;
+  }
+  .cycle-dot.done { background: var(--accent); border-color: var(--accent); }
+  .cycle-dot.current {
+    background: var(--accent);
+    border-color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .cycle-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .timer-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .ctrl {
+    width: 34px;
+    height: 34px;
+    border: 0.5px solid var(--border);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.1s;
+    padding: 0;
+  }
+  .ctrl:hover { border-color: var(--text-muted); }
+  .ctrl:active { transform: scale(0.95); }
+
+  .ctrl.primary {
+    width: 42px;
+    height: 42px;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  .ctrl.primary:hover { opacity: 0.85; }
+
+  .ctrl svg { width: 12px; height: 12px; }
+  .ctrl.primary svg { width: 14px; height: 14px; }
+
+  .settings {
+    padding: 12px 18px;
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+  .setting-row span { font-size: 13px; color: var(--text); }
+
+  .toggle {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: none;
+    padding: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(14px); background: var(--accent-fg); }
+
+  .theme-btns { display: flex; gap: 4px; }
+  .theme-btn {
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .theme-btn.active {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .hidden { display: none !important; }
+
+  .complete-banner {
+    text-align: center;
+    padding: 8px 14px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    animation: bannerOut 3s forwards;
+    overflow: hidden;
+  }
+  @keyframes bannerOut {
+    0%, 70% { opacity: 1; max-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+    100% { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  }
+
+  .form-error {
+    font-size: 11px;
+    color: #c33;
+    margin-top: -6px;
+    margin-bottom: 8px;
+    min-height: 14px;
+  }
+  [data-theme="dark"] .form-error { color: #f88; }
+
+  .install-prompt {
+    margin: 0 18px 14px;
+    padding: 10px 12px;
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .install-prompt button {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .install-prompt .dismiss {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 5px 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <h1>Pomodoro</h1>
+    <button class="icon-btn" id="aboutBtn" title="About">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="6.5"/>
+        <path d="M6.2 6a1.8 1.8 0 0 1 3.6 0c0 1.2-1.8 1.5-1.8 2.6"/>
+        <circle cx="8" cy="11.2" r="0.4" fill="currentColor"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" title="Settings">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>
+    </button>
+  </div>
+
+  <div class="settings hidden" id="settings">
+    <div class="setting-row">
+      <span>Silent mode</span>
+      <button class="toggle" id="silentToggle" aria-label="Silent mode"></button>
+    </div>
+    <div class="setting-row">
+      <span>Theme</span>
+      <div class="theme-btns">
+        <button class="theme-btn" data-theme="auto">Auto</button>
+        <button class="theme-btn" data-theme="light">Light</button>
+        <button class="theme-btn" data-theme="dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings hidden" id="about">
+    <p style="font-size: 13px; color: var(--text); margin-bottom: 8px;">Pomodoro</p>
+    <p style="font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+      A minimalist focus timer.<br>
+      Version 1.0  ·  <a href="https://www.buymeacoffee.com/thetestnestmx" style="color: inherit; text-decoration: underline;">Buy Me A Coffee</a>
+    </p>
+  </div>
+
+  <div id="completeBanner" class="hidden"></div>
+
+  <div id="installPrompt" class="install-prompt hidden">
+    <span>Install as app</span>
+    <div style="display:flex; gap:4px;">
+      <button class="dismiss" id="installDismiss">Not now</button>
+      <button id="installBtn">Install</button>
+    </div>
+  </div>
+
+  <!-- Picker -->
+  <div class="view" id="pickerView">
+    <div class="task-list" id="taskList"></div>
+    <button class="add-task" id="addTaskBtn">+ Custom task</button>
+    <div class="start-bar">
+      <button class="btn-primary" id="startBtn" disabled>START</button>
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="view hidden" id="editorView">
+    <h2 id="editorTitle">New task</h2>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="taskName" placeholder="Task name" maxlength="40" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Focus (min)</label>
+        <input type="number" id="taskFocus" min="1" max="180" value="25">
+      </div>
+      <div class="field">
+        <label>Rest (min)</label>
+        <input type="number" id="taskRest" min="0" max="60" value="5">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Recharge (min)</label>
+        <input type="number" id="taskRecharge" min="0" max="120" value="15">
+      </div>
+      <div class="field">
+        <label>Cycles</label>
+        <input type="number" id="taskCycles" min="1" max="20" value="4">
+      </div>
+    </div>
+    <div class="form-error" id="formError"></div>
+    <div class="editor-actions">
+      <button class="btn-secondary" id="editorCancel">Cancel</button>
+      <button class="btn-danger hidden" id="editorDelete">Delete</button>
+      <button class="btn-primary" id="editorSave">Save</button>
+    </div>
+  </div>
+
+  <!-- Timer -->
+  <div class="view hidden timer-view" id="timerView">
+    <p class="phase-label" id="taskNameLabel">DEEP WORK</p>
+    <svg class="timer-ring" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="50" fill="none" stroke="var(--track)" stroke-width="3"/>
+      <circle id="progressRing" cx="60" cy="60" r="50" fill="none" stroke="var(--accent)" stroke-width="3"
+              stroke-dasharray="314" stroke-dashoffset="0" stroke-linecap="round"
+              transform="rotate(-90 60 60)"/>
+      <text class="time" x="60" y="62" text-anchor="middle" dominant-baseline="middle" id="timeText">25:00</text>
+      <text class="sub" x="60" y="80" text-anchor="middle" id="phaseSub">FOCUS</text>
+    </svg>
+    <div class="cycle-dots" id="cycleDots"></div>
+    <p class="cycle-text" id="cycleText">Cycle 1 of 4</p>
+    <div class="timer-controls">
+      <button class="ctrl" id="stopBtn" title="Stop">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="6" height="6"/></svg>
+      </button>
+      <button class="ctrl primary" id="pauseBtn" title="Pause">
+        <svg id="pauseIcon" viewBox="0 0 12 12" fill="currentColor"><rect x="2.5" y="2" width="2.2" height="8"/><rect x="7.3" y="2" width="2.2" height="8"/></svg>
+      </button>
+      <button class="ctrl" id="skipBtn" title="Skip phase">
+        <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2 1.5v9l7-4.5z"/><rect x="9" y="1.5" width="1" height="9"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const PREDEFINED = [
+    { id: 'p_deep',   name: 'Deep work',     focus: 25, rest: 5,  recharge: 15, cycles: 4, predefined: true },
+    { id: 'p_sprint', name: 'Quick sprint',  focus: 15, rest: 3,  recharge: 10, cycles: 2, predefined: true },
+    { id: 'p_study',  name: 'Study session', focus: 50, rest: 10, recharge: 30, cycles: 2, predefined: true },
+    { id: 'p_read',   name: 'Reading',       focus: 25, rest: 0,  recharge: 10, cycles: 1, predefined: true }
+  ];
+
+  const PAUSE_SVG = '<rect x="2.5" y="2" width="2.2" height="8"/><rect x="7.3" y="2" width="2.2" height="8"/>';
+  const PLAY_SVG  = '<path d="M3 1.5v9l7-4.5z"/>';
+
+  const state = {
+    customTasks: load('customTasks', []),
+    silentMode:  load('silentMode', false),
+    theme:       load('theme', 'auto'),
+    installDismissed: load('installDismissed', false),
+    selectedId: null,
+    editing: null,
+    sequence: [],
+    phaseIndex: 0,
+    endTimestamp: 0,
+    pausedRemainingMs: 0,
+    isPaused: false,
+    currentTask: null,
+    tickHandle: null,
+    deferredInstallPrompt: null
+  };
+
+  function load(key, fallback) {
+    try {
+      const v = localStorage.getItem('pomodoro_' + key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch { return fallback; }
+  }
+  function persist(key, value) {
+    try { localStorage.setItem('pomodoro_' + key, JSON.stringify(value)); } catch {}
+  }
+
+  function applyTheme() {
+    let theme = state.theme;
+    if (theme === 'auto') {
+      theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelectorAll('.theme-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === state.theme);
+    });
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+  let audioCtx = null;
+  function beep(freq, duration, delay) {
+    if (state.silentMode) return;
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch { return; }
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  function phaseEnterSound(phase) {
+    if (phase === 'focus') {
+      beep(880, 0.1, 0);
+      beep(1100, 0.14, 0.13);
+    } else {
+      beep(660, 0.1, 0);
+      beep(520, 0.14, 0.13);
+    }
+  }
+
+  function completeSound() {
+    beep(880, 0.12, 0);
+    beep(1100, 0.12, 0.14);
+    beep(1320, 0.22, 0.28);
+  }
+
+  function allTasks() { return [...PREDEFINED, ...state.customTasks]; }
+  function findTask(id) { return allTasks().find(t => t.id === id); }
+
+  function buildSequence(task) {
+    const seq = [];
+    for (let i = 0; i < task.cycles; i++) {
+      seq.push({ phase: 'focus', minutes: task.focus, cycleIdx: i });
+      if (i < task.cycles - 1 && task.rest > 0) {
+        seq.push({ phase: 'rest', minutes: task.rest, cycleIdx: i });
+      }
+    }
+    if (task.recharge > 0) {
+      seq.push({ phase: 'recharge', minutes: task.recharge, cycleIdx: task.cycles - 1 });
+    }
+    return seq;
+  }
+
+  function renderPicker() {
+    const list = document.getElementById('taskList');
+    list.innerHTML = '';
+    allTasks().forEach(task => {
+      const item = document.createElement('div');
+      item.className = 'task-item' + (state.selectedId === task.id ? ' selected' : '');
+
+      const restText = task.rest > 0 ? task.rest + ' rest' : 'no rest';
+      const rechargeText = task.recharge > 0 ? task.recharge + ' recharge' : 'no recharge';
+      const cycleText = task.cycles === 1 ? '1 cycle' : task.cycles + ' cycles';
+
+      const info = document.createElement('div');
+      info.className = 'task-info';
+      const nameP = document.createElement('p');
+      nameP.textContent = task.name;
+      const detailsP = document.createElement('p');
+      detailsP.textContent = task.focus + ' focus  ·  ' + restText + '  ·  ' + rechargeText + '  ·  ' + cycleText;
+      info.appendChild(nameP);
+      info.appendChild(detailsP);
+
+      const actions = document.createElement('div');
+      actions.className = 'task-actions';
+
+      if (!task.predefined) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'icon-btn task-edit';
+        editBtn.title = 'Edit';
+        editBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M11 2.5l2.5 2.5-7.5 7.5H3.5V10z"/></svg>';
+        editBtn.onclick = (e) => { e.stopPropagation(); openEditor(task); };
+        actions.appendChild(editBtn);
+      }
+
+      const radio = document.createElement('div');
+      radio.className = 'radio';
+      actions.appendChild(radio);
+
+      item.appendChild(info);
+      item.appendChild(actions);
+
+      item.onclick = () => {
+        state.selectedId = task.id;
+        renderPicker();
+        document.getElementById('startBtn').disabled = false;
+      };
+
+      list.appendChild(item);
+    });
+  }
+
+  function openEditor(task) {
+    state.editing = task;
+    document.getElementById('editorTitle').textContent = task ? 'Edit task' : 'New task';
+    document.getElementById('taskName').value     = task ? task.name     : '';
+    document.getElementById('taskFocus').value    = task ? task.focus    : 25;
+    document.getElementById('taskRest').value     = task ? task.rest     : 5;
+    document.getElementById('taskRecharge').value = task ? task.recharge : 15;
+    document.getElementById('taskCycles').value   = task ? task.cycles   : 4;
+    document.getElementById('editorDelete').classList.toggle('hidden', !task);
+    document.getElementById('formError').textContent = '';
+    showView('editorView');
+    setTimeout(() => document.getElementById('taskName').focus(), 50);
+  }
+
+  function saveTask() {
+    const errEl = document.getElementById('formError');
+    const name     = document.getElementById('taskName').value.trim();
+    const focus    = parseInt(document.getElementById('taskFocus').value, 10);
+    const rest     = parseInt(document.getElementById('taskRest').value, 10);
+    const recharge = parseInt(document.getElementById('taskRecharge').value, 10);
+    const cycles   = parseInt(document.getElementById('taskCycles').value, 10);
+
+    errEl.textContent = '';
+    if (!name) { errEl.textContent = 'Name required'; document.getElementById('taskName').focus(); return; }
+    if (!(focus >= 1))    { errEl.textContent = 'Focus must be at least 1 minute'; return; }
+    if (!(rest >= 0))     { errEl.textContent = 'Rest cannot be negative'; return; }
+    if (!(recharge >= 0)) { errEl.textContent = 'Recharge cannot be negative'; return; }
+    if (!(cycles >= 1))   { errEl.textContent = 'Cycles must be at least 1'; return; }
+
+    if (state.editing) {
+      const idx = state.customTasks.findIndex(t => t.id === state.editing.id);
+      if (idx >= 0) {
+        state.customTasks[idx] = { id: state.editing.id, name, focus, rest, recharge, cycles };
+      }
+    } else {
+      const newTask = {
+        id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name, focus, rest, recharge, cycles
+      };
+      state.customTasks.push(newTask);
+      state.selectedId = newTask.id;
+    }
+    persist('customTasks', state.customTasks);
+    closeEditor();
+    document.getElementById('startBtn').disabled = !state.selectedId;
+  }
+
+  function deleteTask() {
+    if (!state.editing) return;
+    if (!confirm('Delete this task?')) return;
+    state.customTasks = state.customTasks.filter(t => t.id !== state.editing.id);
+    persist('customTasks', state.customTasks);
+    if (state.selectedId === state.editing.id) {
+      state.selectedId = null;
+      document.getElementById('startBtn').disabled = true;
+    }
+    closeEditor();
+  }
+
+  function closeEditor() {
+    state.editing = null;
+    showView('pickerView');
+    renderPicker();
+  }
+
+  function startSession() {
+    const task = findTask(state.selectedId);
+    if (!task) return;
+    state.currentTask = task;
+    state.sequence = buildSequence(task);
+    if (state.sequence.length === 0) return;
+    state.phaseIndex = 0;
+    state.isPaused = false;
+    document.getElementById('taskNameLabel').textContent = task.name.toUpperCase();
+    showView('timerView');
+    beginPhase();
+  }
+
+  function beginPhase() {
+    const phase = state.sequence[state.phaseIndex];
+    state.endTimestamp = Date.now() + phase.minutes * 60 * 1000;
+    state.isPaused = false;
+    document.getElementById('pauseBtn').title = 'Pause';
+    document.getElementById('pauseIcon').innerHTML = PAUSE_SVG;
+    phaseEnterSound(phase.phase);
+    updateTimerDisplay(phase.minutes * 60 * 1000);
+    if (state.tickHandle) clearInterval(state.tickHandle);
+    state.tickHandle = setInterval(tick, 250);
+  }
+
+  function tick() {
+    if (state.isPaused) return;
+    const remaining = Math.max(0, state.endTimestamp - Date.now());
+    updateTimerDisplay(remaining);
+    if (remaining <= 0) nextPhase();
+  }
+
+  function updateTimerDisplay(remainingMs) {
+    const phase = state.sequence[state.phaseIndex];
+    if (!phase) return;
+    const totalMs = phase.minutes * 60 * 1000;
+    const minutes = Math.floor(remainingMs / 60000);
+    const seconds = Math.floor((remainingMs % 60000) / 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    document.getElementById('timeText').textContent = pad(minutes) + ':' + pad(seconds);
+    document.getElementById('phaseSub').textContent = phase.phase.toUpperCase();
+
+    const ring = document.getElementById('progressRing');
+    const C = 2 * Math.PI * 50;
+    const progress = totalMs > 0 ? remainingMs / totalMs : 0;
+    ring.setAttribute('stroke-dasharray', C);
+    ring.setAttribute('stroke-dashoffset', C * (1 - progress));
+
+    const cycleText = document.getElementById('cycleText');
+    if (phase.phase === 'recharge') {
+      cycleText.textContent = 'Recharge';
+    } else {
+      cycleText.textContent = 'Cycle ' + (phase.cycleIdx + 1) + ' of ' + state.currentTask.cycles;
+    }
+    renderCycleDots();
+  }
+
+  function renderCycleDots() {
+    const container = document.getElementById('cycleDots');
+    container.innerHTML = '';
+    if (!state.currentTask) return;
+    const total = state.currentTask.cycles;
+    const phase = state.sequence[state.phaseIndex];
+    if (!phase) return;
+
+    let completedFocus = 0;
+    for (let i = 0; i < state.phaseIndex; i++) {
+      if (state.sequence[i].phase === 'focus') completedFocus++;
+    }
+    const currentIsFocus = phase.phase === 'focus';
+    const isRecharge = phase.phase === 'recharge';
+
+    for (let i = 0; i < total; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'cycle-dot';
+      if (isRecharge) {
+        dot.classList.add('done');
+      } else if (i < completedFocus) {
+        dot.classList.add('done');
+      } else if (i === completedFocus && currentIsFocus) {
+        dot.classList.add('current');
+      }
+      container.appendChild(dot);
+    }
+  }
+
+  function nextPhase() {
+    state.phaseIndex++;
+    if (state.phaseIndex >= state.sequence.length) {
+      finishSession();
+      return;
+    }
+    beginPhase();
+  }
+
+  function finishSession() {
+    if (state.tickHandle) { clearInterval(state.tickHandle); state.tickHandle = null; }
+    completeSound();
+    state.currentTask = null;
+    state.sequence = [];
+    state.phaseIndex = 0;
+    showCompleteBanner();
+    showView('pickerView');
+  }
+
+  function showCompleteBanner() {
+    const b = document.getElementById('completeBanner');
+    b.textContent = 'Session complete';
+    b.className = 'complete-banner';
+    b.style.animation = 'none';
+    void b.offsetWidth;
+    b.style.animation = '';
+    setTimeout(() => { b.classList.add('hidden'); }, 3100);
+  }
+
+  function pauseToggle() {
+    if (state.isPaused) {
+      state.endTimestamp = Date.now() + state.pausedRemainingMs;
+      state.isPaused = false;
+      document.getElementById('pauseBtn').title = 'Pause';
+      document.getElementById('pauseIcon').innerHTML = PAUSE_SVG;
+    } else {
+      state.pausedRemainingMs = Math.max(0, state.endTimestamp - Date.now());
+      state.isPaused = true;
+      document.getElementById('pauseBtn').title = 'Resume';
+      document.getElementById('pauseIcon').innerHTML = PLAY_SVG;
+    }
+  }
+
+  function skipPhase() { nextPhase(); }
+
+  function stopSession() {
+    if (state.tickHandle) { clearInterval(state.tickHandle); state.tickHandle = null; }
+    state.currentTask = null;
+    state.sequence = [];
+    state.phaseIndex = 0;
+    state.isPaused = false;
+    showView('pickerView');
+  }
+
+  function showView(id) {
+    ['pickerView', 'editorView', 'timerView'].forEach(v => {
+      document.getElementById(v).classList.add('hidden');
+    });
+    document.getElementById(id).classList.remove('hidden');
+    if (id !== 'pickerView') {
+      document.getElementById('settings').classList.add('hidden');
+      document.getElementById('about').classList.add('hidden');
+    }
+  }
+
+  document.getElementById('settingsBtn').onclick = () => {
+    const settings = document.getElementById('settings');
+    document.getElementById('about').classList.add('hidden');
+    settings.classList.toggle('hidden');
+  };
+
+  document.getElementById('aboutBtn').onclick = () => {
+    const about = document.getElementById('about');
+    document.getElementById('settings').classList.add('hidden');
+    about.classList.toggle('hidden');
+  };
+
+  document.getElementById('silentToggle').onclick = () => {
+    state.silentMode = !state.silentMode;
+    document.getElementById('silentToggle').classList.toggle('on', state.silentMode);
+    persist('silentMode', state.silentMode);
+  };
+
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.onclick = () => {
+      state.theme = b.dataset.theme;
+      persist('theme', state.theme);
+      applyTheme();
+    };
+  });
+
+  document.getElementById('addTaskBtn').onclick   = () => openEditor(null);
+  document.getElementById('startBtn').onclick     = startSession;
+  document.getElementById('editorCancel').onclick = closeEditor;
+  document.getElementById('editorSave').onclick   = saveTask;
+  document.getElementById('editorDelete').onclick = deleteTask;
+  document.getElementById('pauseBtn').onclick     = pauseToggle;
+  document.getElementById('skipBtn').onclick      = skipPhase;
+  document.getElementById('stopBtn').onclick      = stopSession;
+
+  ['taskName', 'taskFocus', 'taskRest', 'taskRecharge', 'taskCycles'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveTask();
+      if (e.key === 'Escape') closeEditor();
+    });
+  });
+
+  // ---- PWA wiring ----
+
+  // Service worker registration. Wrapped in feature detection so the page still
+  // works fine when opened from file:// or in browsers without SW support.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // Install prompt: Chrome/Edge fire `beforeinstallprompt` when the app is
+  // installable. We surface a small banner so users see the option without
+  // hunting for it in the browser menu. iOS Safari doesn't fire this event —
+  // there, users install via Share → Add to Home Screen.
+  const installPrompt = document.getElementById('installPrompt');
+  const installBtn = document.getElementById('installBtn');
+  const installDismiss = document.getElementById('installDismiss');
+
+  function isStandalone() {
+    return matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    state.deferredInstallPrompt = e;
+    if (!state.installDismissed && !isStandalone()) {
+      installPrompt.classList.remove('hidden');
+    }
+  });
+
+  installBtn.onclick = async () => {
+    const dp = state.deferredInstallPrompt;
+    if (!dp) return;
+    installPrompt.classList.add('hidden');
+    dp.prompt();
+    await dp.userChoice;
+    state.deferredInstallPrompt = null;
+  };
+
+  installDismiss.onclick = () => {
+    installPrompt.classList.add('hidden');
+    state.installDismissed = true;
+    persist('installDismissed', true);
+  };
+
+  window.addEventListener('appinstalled', () => {
+    installPrompt.classList.add('hidden');
+    state.deferredInstallPrompt = null;
+  });
+
+  // ---- Init ----
+
+  document.getElementById('silentToggle').classList.toggle('on', state.silentMode);
+  applyTheme();
+  renderPicker();
+  showView('pickerView');
+})();
+</script>
+
+</body>
+</html>
