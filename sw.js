@@ -1,6 +1,6 @@
 // Service worker — caches the app shell so it works offline and launches instantly.
 // Bump CACHE_VERSION whenever you ship updated HTML/CSS/JS so users get the new build.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `pomodoro-${CACHE_VERSION}`;
 
 const PRECACHE = [
